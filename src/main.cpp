@@ -8,12 +8,15 @@
 #include "util/filesystem.hpp"
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <typeinfo>
 
 
 
 // Project specific includes
 ////////////////////////////////////////////////////////////////////////////////
-#include "easing/EasingFn.hpp"
+#include "easing/easing.hpp"
+#include "easing/easing_functions.hpp"
+#include "motion/Motion.hpp"
 
 
 
@@ -52,9 +55,40 @@ int main([[maybe_unused]]const int argc, const char** argv)
 ////////////////////////////////////////////////////////////////////////////////
 
 
+    // keyboard utils
+    auto const is_one_of_quit_keys = [](sf::Keyboard::Key const& k)
+    {
+        return k == Keyb::Enter || k == Keyb::Escape || k == Keyb::Space;
+    };
 
-    Graphics_container gfx {  };
 
+    auto const is_one_of_control_keys = [](sf::Keyboard::Key const& k)
+    {
+        return k == Keyb::Z || k == Keyb::Q || k == Keyb::S || k == Keyb::D;
+    };
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+    sf::RectangleShape e {{64, 64}};
+    e.setOutlineColor(sf::Color::Black);
+    e.setOutlineThickness(2.f);
+    e.setFillColor(sf::Color::White);
+
+
+    Motion player_motion {324.f};
+
+
+
+    constexpr float e_speed = 256.f;
+
+
+
+    Graphics_container gfx { e };
 
 
 
@@ -70,16 +104,26 @@ int main([[maybe_unused]]const int argc, const char** argv)
         {
             if (event.type == sf::Event::KeyPressed)
             {
-                switch (event.key.code)
-                {
-                case Keyb::Enter:
-                case Keyb::Escape:
-                case Keyb::Space:
-                    window.close();
-                break;
+                auto const& code = event.key.code;
 
-                default:
-                break;
+                if (is_one_of_quit_keys(code))
+                {
+                    window.close();
+                }
+
+                else if (is_one_of_control_keys(code))
+                {
+
+                }
+            }
+
+            else if (event.type == sf::Event::KeyReleased)
+            {
+                auto const& code = event.key.code;
+
+                if (is_one_of_control_keys(code))
+                {
+
                 }
             }
 
@@ -89,15 +133,33 @@ int main([[maybe_unused]]const int argc, const char** argv)
             }
         }
 
+
         // Frame time
         const auto frame_time = clock.restart();
         const auto frame_seconds = frame_time.asSeconds();
 
-        // real-time events
+
+        // real-time mouse
         mouse.update(window);
         if (sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
             window.move_proportional_view(mouse.delta<float>());
         }
+
+
+        // real-time keyboard
+        if (is_pressed(Keyb::Q)) {
+            e.move(-e_speed*frame_seconds, 0);
+        }
+        else if (is_pressed(Keyb::D)) {
+            e.move(e_speed*frame_seconds, 0);
+        }
+        if (is_pressed(Keyb::Z)) {
+            e.move(0, -e_speed*frame_seconds);
+        }
+        else if (is_pressed(Keyb::S)) {
+            e.move(0, e_speed*frame_seconds);
+        }
+
 
         // Rendering
         window.clear({172, 215, 255});
