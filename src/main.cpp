@@ -20,7 +20,6 @@
 
 
 
-// Program start
 ////////////////////////////////////////////////////////////////////////////////
 int main([[maybe_unused]]const int argc, const char** argv)
 {
@@ -74,21 +73,23 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
 
-    sf::RectangleShape e {{64, 64}};
-    e.setOutlineColor(sf::Color::Black);
-    e.setOutlineThickness(2.f);
-    e.setFillColor(sf::Color::White);
+    sf::RectangleShape player {{64, 64}};
+    player.setOutlineColor(sf::Color::Black);
+    player.setOutlineThickness(2.f);
+    player.setFillColor(sf::Color::White);
 
 
-    Motion player_motion {324.f};
+    Motion player_motion {.max_speed = 324.f};
+
+    constexpr float acceleration = 300.f;
+    constexpr float deceleration = 300.f;
 
 
 
-    constexpr float e_speed = 256.f;
+    Graphics_container gfx { player };
 
+    window.proportional_view().setCenter(player.getPosition());
 
-
-    Graphics_container gfx { e };
 
 
 
@@ -111,9 +112,28 @@ int main([[maybe_unused]]const int argc, const char** argv)
                     window.close();
                 }
 
-                else if (is_one_of_control_keys(code))
+                else if (is_one_of_control_keys(code)
+                    && !is_actively_moving(player_motion))
                 {
+                    player_motion.state = Motion::Accelerating;
+                }
 
+                else if (code == Keyb::M)
+                {
+                    player_motion.state = Motion::Accelerating;
+                    player_motion.direction = {1.f, 0.f};
+                    std::cout << "Entered \"Accelerating\" state.\n";
+                }
+
+                else if (code == Keyb::L)
+                {
+                    player_motion.state = Motion::Decelerating;
+                    std::cout << "Entered \"Decelerating\" state.\n";
+                }
+
+                else if (code == Keyb::C)
+                {
+                    window.proportional_view().setCenter(player.getPosition());
                 }
             }
 
@@ -121,9 +141,10 @@ int main([[maybe_unused]]const int argc, const char** argv)
             {
                 auto const& code = event.key.code;
 
-                if (is_one_of_control_keys(code))
+                if (is_one_of_control_keys(code)
+                    && is_actively_moving(player_motion))
                 {
-
+                    player_motion.state = Motion::Decelerating;
                 }
             }
 
@@ -134,7 +155,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
         }
 
 
-        // Frame time
+        // frame time
         const auto frame_time = clock.restart();
         const auto frame_seconds = frame_time.asSeconds();
 
@@ -146,18 +167,45 @@ int main([[maybe_unused]]const int argc, const char** argv)
         }
 
 
-        // real-time keyboard
-        if (is_pressed(Keyb::Q)) {
-            e.move(-e_speed*frame_seconds, 0);
+        // player motion
+        if (player_motion.state == Motion::Accelerating)
+        {
+            if (player_motion.speed < player_motion.max_speed)
+            {
+                player_motion.speed += frame_seconds * acceleration;
+            }
+
+            else
+            {
+                player_motion.state = Motion::Cruising;
+                player_motion.speed = player_motion.max_speed;
+                std::cout << "Entered \"Cruising\" state.\n";
+            }
         }
-        else if (is_pressed(Keyb::D)) {
-            e.move(e_speed*frame_seconds, 0);
+
+        else if (player_motion.state == Motion::Decelerating)
+        {
+            if (player_motion.speed > 0.f)
+            {
+                player_motion.speed -= frame_seconds * deceleration;
+            }
+
+            else
+            {
+                player_motion.state = Motion::Halted;
+                player_motion.speed = 0.f;
+                std::cout << "Entered \"Halted\" state.\n";
+            }
         }
-        if (is_pressed(Keyb::Z)) {
-            e.move(0, -e_speed*frame_seconds);
-        }
-        else if (is_pressed(Keyb::S)) {
-            e.move(0, e_speed*frame_seconds);
+
+        if (player_motion.state != Motion::Halted)
+        {
+            auto const distance = player_motion.speed * frame_seconds;
+
+            player.move(
+                player_motion.direction.horizontal * distance,
+                player_motion.direction.vertical * distance
+            );
         }
 
 
