@@ -1,5 +1,6 @@
 #pragma once
 #include <SFML/Window.hpp>
+#include <initializer_list>
 
 
 // Alias shortcuts
@@ -28,3 +29,15 @@ struct Pressed_modifiers
         return ctrl && !(l_alt || r_alt);
     }
 };
+
+
+// Check key code against a list of codes
+inline bool is_one_of(std::initializer_list<Keyb const> keys, Keyb const& key)
+{
+    for (auto const& k : std::as_const(keys)) {
+        if (k == key) {
+            return true;
+        }
+    }
+    return false;
+}

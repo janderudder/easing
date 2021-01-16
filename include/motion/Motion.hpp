@@ -10,15 +10,9 @@ struct Motion
         Decelerating    = 0b10
     };
 
-    struct Direction {
-        float horizontal;
-        float vertical  ;
-    };
-
     float       max_speed;
     float       speed        = 0.f;
     State       state        = Halted;
-    Direction   direction    = {0.f, 0.f};
 };
 
 
