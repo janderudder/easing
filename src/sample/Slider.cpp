@@ -2,9 +2,9 @@
 
 
 
-Slider::Slider(float length, float radius, float ratio) noexcept
+Slider::Slider(unsigned length, float radius, float ratio) noexcept
     : m_circle  {radius}
-    , m_line    {{length, 2.f}}
+    , m_line    {{float(length), 2.f}}
 {
     m_line.setFillColor(sf::Color::Black);
 
@@ -13,7 +13,7 @@ Slider::Slider(float length, float radius, float ratio) noexcept
     m_circle.setOutlineThickness(2.5f);
     m_circle.setOrigin(radius, radius);
 
-    set_ratio(_validate_ratio(ratio));
+    set_ratio(ratio);
 }
 
 
@@ -34,7 +34,7 @@ void Slider::set_circle_position(float x)
 
 float Slider::ratio() const
 {
-    return length() / circle_position();
+    return circle_position() / length();
 }
 
 
@@ -67,8 +67,8 @@ float Slider::_validate_position(float x) const
     if (x < 0.f) {
         return 0.f;
     }
-    else if (x > m_line.getSize().x) {
-        return m_line.getSize().x;
+    else if (x > length()) {
+        return length();
     }
     else {
         return x;

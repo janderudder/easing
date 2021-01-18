@@ -13,7 +13,7 @@ class Slider
     sf::RectangleShape  m_line;
 
 public:
-    Slider(float length, float radius, float ratio = 0) noexcept;
+    Slider(unsigned length, float radius = 16.f, float ratio = 0) noexcept;
 
     void set_ratio(float);
     void set_circle_position(float);
