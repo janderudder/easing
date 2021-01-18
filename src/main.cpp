@@ -1,11 +1,13 @@
 // Utilities and libraries
 ////////////////////////////////////////////////////////////////////////////////
 #include "sfext/Graphics_container.hpp"
+#include "sfext/Grid_layout_simple.hpp"
 #include "sfext/Mouse_controller.hpp"
 #include "sfext/sf.keyboard.ext.hpp"
 #include "sfext/sf.transform.ext.hpp"
 #include "sfext/Vertex_array.hpp"
 #include "sfext/Window.hpp"
+#include "util/echo.hpp"
 #include "util/filesystem.hpp"
 #include <SFML/Graphics.hpp>
 #include <iostream>
@@ -50,27 +52,45 @@ int main([[maybe_unused]]const int argc, const char** argv)
     sf::Font font;
     font.loadFromFile((resource_path/"font/CutiveMono-Regular.ttf").string());
 
-    // keyboard
-    auto const quit_keys = {Keyb::Enter, Keyb::Escape};
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-
-    Slider slider1 {768, 18.f};
-
+    auto constexpr slider_length = 768u;
 
 
-    Graphics_container gfx { slider1 };
-    gfx.move(64, 64);
+    std::vector<Slider> sliders (2, Slider{slider_length});
 
 
+    Grid_layout_simple layout {1, {float(slider_length), 128.f}};
+    layout.move(88, 128);
 
-    std::vector<Slider*> sliders {&slider1};
-    Slider* active_slider = nullptr;
-    Slider* mouse_active_slider = nullptr;
 
+    for (auto const& slider : std::as_const(sliders)) {
+        layout.add(slider);
+    }
+
+
+    auto const sliders_set_ratios = [&sliders](float ratio)
+    {
+        for (auto& slider : sliders) {
+            slider.set_ratio(ratio);
+        }
+    };
+
+
+    class
+    {
+        bool        m_is_active   = false;
+        float const m_speed       = 300.f;
+     public:
+
+        float speed() const         { return m_speed; }
+        bool is_active() const      { return m_is_active; }
+        void set_active(bool b)     { m_is_active = b; }
+
+    } animation;
 
 
 
@@ -85,28 +105,20 @@ int main([[maybe_unused]]const int argc, const char** argv)
         for (sf::Event event; window.poll_event(event);)
         {
             if (event.type == sf::Event::KeyPressed)
-            {
-                auto const& code = event.key.code;
-
-                if (is_one_of(quit_keys, code)) {
-                    window.close();
-                }
-
-                else if (code == Keyb::Space)
+            {   switch (event.key.code)
                 {
-                    if (active_slider) {
-                        active_slider = nullptr;
-                    }
-                    else
-                    {
-                        active_slider = &slider1;
+                case Keyb::Escape:
+                    window.close();
+                break;
 
-                        if (active_slider->ratio() == 1.f)
-                        {
-                            active_slider->set_ratio(0);
-                            active_slider = nullptr;
-                        }
-                    }
+                case Keyb::Enter:
+                    sliders_set_ratios(0.f);
+                break;
+
+                case Keyb::Space:
+                    animation.set_active(!animation.is_active());
+                default:
+                break;
                 }
             }
 
@@ -131,22 +143,24 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
         // moving sliders
-        if (mouse_active_slider)
+        if (animation.is_active())
         {
-            active_slider->set_circle_position(
-                active_slider->circle_position() + -mouse.delta<float>().x
-            );
-        }
+            bool maybe_animation_finished = true;
 
+            auto const distance = animation.speed() * frame_seconds;
 
-        if (active_slider)
-        {
-            active_slider->set_circle_position(
-                active_slider->circle_position() + 300.f * frame_seconds
-            );
+            for (auto& slider : sliders)
+            {
+                if (slider.ratio() < 1.f)
+                {
+                    maybe_animation_finished = false;
+                    slider.set_circle_position(slider.circle_position() + distance);
+                }
+            }
 
-            if (active_slider->ratio() == 1.f) {
-                active_slider = nullptr;
+            if (maybe_animation_finished)
+            {
+                sliders_set_ratios(0.f);
             }
         }
 
@@ -155,7 +169,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
         window.clear({172, 215, 255});
         window.set_proportional_view();
 
-        window.draw(gfx);
+        window.draw(layout);
 
         window.display();
 
