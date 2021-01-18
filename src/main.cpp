@@ -5,7 +5,6 @@
 #include "sfext/Mouse_controller.hpp"
 #include "sfext/sf.keyboard.ext.hpp"
 #include "sfext/sf.transform.ext.hpp"
-#include "sfext/Vertex_array.hpp"
 #include "sfext/Window.hpp"
 #include "util/echo.hpp"
 #include "util/filesystem.hpp"
@@ -57,20 +56,20 @@ int main([[maybe_unused]]const int argc, const char** argv)
 ////////////////////////////////////////////////////////////////////////////////
 
 
+
+    std::vector<easing_fn_t> easing_functions
+    {
+        easing_linear,
+        easing_linear_square,
+        easing_linear_cube,
+        easing_easy
+    };
+
+
+
     auto constexpr slider_length = 768u;
 
-
-    std::vector<Slider> sliders (2, Slider{slider_length});
-
-
-    Grid_layout_simple layout {1, {float(slider_length), 128.f}};
-    layout.move(88, 128);
-
-
-    for (auto const& slider : std::as_const(sliders)) {
-        layout.add(slider);
-    }
-
+    std::vector<Slider> sliders (easing_functions.size(), Slider{slider_length, 16.f, 0.5f});
 
     auto const sliders_set_ratios = [&sliders](float ratio)
     {
@@ -78,6 +77,15 @@ int main([[maybe_unused]]const int argc, const char** argv)
             slider.set_ratio(ratio);
         }
     };
+
+
+
+    Grid_layout_simple layout {1, {float(slider_length), 128.f}};
+    for (auto const& slider : std::as_const(sliders)) {
+        layout.add(slider);
+    }
+    layout.move(88, 128);
+
 
 
     class
@@ -145,20 +153,32 @@ int main([[maybe_unused]]const int argc, const char** argv)
         // moving sliders
         if (animation.is_active())
         {
-            bool maybe_animation_finished = true;
+            bool is_animation_finished = true; // maybe
 
             auto const distance = animation.speed() * frame_seconds;
 
-            for (auto& slider : sliders)
+            for (size_t i=0; i < sliders.size(); ++i)
             {
-                if (slider.ratio() < 1.f)
+                auto const interpolated_value = interpolate(
+                    easing_functions[i],
+                    sliders[i].circle_position() / sliders[i].length() + distance,
+                    0.f,
+                    sliders[i].length()
+                );
+
+                if (i == 3) {
+                    ECHO_LN(interpolated_value);
+                }
+
+                if (sliders[i].ratio() < 1.f)
                 {
-                    maybe_animation_finished = false;
-                    slider.set_circle_position(slider.circle_position() + distance);
+                    is_animation_finished = false;
+                    // sliders[i].set_circle_position(sliders[i].circle_position() + distance * interpolated_value);
+                    sliders[i].set_circle_position(interpolated_value);
                 }
             }
 
-            if (maybe_animation_finished)
+            if (is_animation_finished)
             {
                 sliders_set_ratios(0.f);
             }

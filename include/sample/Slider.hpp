@@ -17,6 +17,7 @@ public:
 
     void set_ratio(float);
     void set_circle_position(float);
+    void move_circle(float);
 
     float ratio() const;
     float circle_position() const;

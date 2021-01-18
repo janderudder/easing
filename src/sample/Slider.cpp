@@ -32,6 +32,14 @@ void Slider::set_circle_position(float x)
 
 
 
+void Slider::move_circle(float offs)
+{
+    set_circle_position(circle_position() + offs);
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 float Slider::ratio() const
 {
     return circle_position() / length();
