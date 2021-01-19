@@ -16,6 +16,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "easing/easing.hpp"
 #include "easing/Interpolation.hpp"
+#include "sample/Colored_square.hpp"
 #include "sample/Slider.hpp"
 
 
@@ -72,7 +73,8 @@ int main([[maybe_unused]]const int argc, const char** argv)
     auto constexpr  slider_length       = 768u;
     auto const      pause_at_end_time   = sf::milliseconds(500);
     float constexpr animation_duration  = 1.5f;
-
+    static sf::Color const start_color  = sf::Color::Black;
+    static sf::Color const end_color    = sf::Color::White;
 
 
     std::vector<easing_fn_t> easing_functions
@@ -96,12 +98,14 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
     std::vector<Slider> sliders(easing_functions.size(), Slider{slider_length});
 
+    std::vector<Colored_square> squares (easing_functions.size(), start_color);
+
 
     std::vector<Interpolation> active_interpolations;
 
 
     auto const reset_sample_animation
-        = [&active_interpolations, &sliders, &easing_functions]
+        = [&active_interpolations, &sliders, &squares, &easing_functions]
     {
         active_interpolations.clear();
 
@@ -110,6 +114,20 @@ int main([[maybe_unused]]const int argc, const char** argv)
             sliders[i].set_ratio(0.f);
             active_interpolations.emplace_back(
                 easing_functions[i], 0.f, slider_length, animation_duration);
+        }
+
+        for (size_t i=0; i < squares.size(); ++i)
+        {
+            squares[i].set_color(start_color);
+
+            active_interpolations.emplace_back(
+                easing_functions[i], start_color.r, end_color.r, animation_duration);
+
+            active_interpolations.emplace_back(
+                easing_functions[i], start_color.g, end_color.g, animation_duration);
+
+            active_interpolations.emplace_back(
+                easing_functions[i], start_color.b, end_color.b, animation_duration);
         }
     };
 
@@ -123,11 +141,12 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-    Grid_layout_simple layout {2, {float(slider_length) + 64.f, 128.f}};
+    Grid_layout_simple layout {3, {/* float(slider_length) + 64.f */128.f, 128.f}};
 
     for (size_t i=0; i < sliders.size(); ++i) {
-        layout.add(sliders[i]);
         layout.add(easing_name_texts[i]);
+        layout.add(squares[i]);
+        layout.add(sliders[i]);
     }
 
     layout.move(88, 128);
@@ -195,13 +214,23 @@ int main([[maybe_unused]]const int argc, const char** argv)
             {
                 auto& slider = sliders[i];
 
-                if (slider.ratio() < 1.f)
+                if (slider.ratio() < 1.f)   // this accounts for sliders finishing at different times (which should not happen)
                 {
                     anim_reached_end = false;
 
                     auto& interpolate = active_interpolations[i];
                     slider.set_circle_position(interpolate(frame_seconds));
                 }
+            }
+
+            auto const interp_index_offset = sliders.size();
+            for (size_t i=0; i < squares.size(); ++i)
+            {
+                squares[i].set_color({
+                    (sf::Uint8)active_interpolations[interp_index_offset+i](frame_seconds),
+                    (sf::Uint8)active_interpolations[interp_index_offset+i+1](frame_seconds),
+                    (sf::Uint8)active_interpolations[interp_index_offset+i+2](frame_seconds)
+                });
             }
 
             if (anim_reached_end) {

@@ -1,13 +1,12 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <array>
+#include "sample/IGfx_entity.hpp"
 
 /*
     Slider's ratio is in interval [0, 1]
 */
-class Slider
-    : public sf::Drawable
-    , public sf::Transformable
+class Slider: public IGfx_entity
 {
     sf::CircleShape     m_circle;
     sf::RectangleShape  m_line;
