@@ -1,10 +1,8 @@
 // Utilities and libraries
 ////////////////////////////////////////////////////////////////////////////////
-#include "sfext/Graphics_container.hpp"
 #include "sfext/Grid_layout_simple.hpp"
 #include "sfext/Mouse_controller.hpp"
 #include "sfext/sf.keyboard.ext.hpp"
-#include "sfext/sf.transform.ext.hpp"
 #include "sfext/Window.hpp"
 #include "util/echo.hpp"
 #include "util/filesystem.hpp"
@@ -17,6 +15,7 @@
 // Project specific includes
 ////////////////////////////////////////////////////////////////////////////////
 #include "easing/easing.hpp"
+#include "easing/Interpolation.hpp"
 #include "sample/Slider.hpp"
 
 
@@ -54,6 +53,25 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+    auto const make_name_text = [&font](sf::String const& str)
+    {
+        sf::Text t{str, font};
+        t.setFillColor(sf::Color::White);
+        t.setOutlineColor(sf::Color::Black);
+        t.setOutlineThickness(2.f);
+        return t;
+    };
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+    // Config sample
+    auto constexpr  slider_length       = 768u;
+    auto const      pause_at_end_time   = sf::milliseconds(500);
+    float constexpr animation_duration  = 1.5f;
 
 
 
@@ -66,39 +84,54 @@ int main([[maybe_unused]]const int argc, const char** argv)
     };
 
 
-
-    auto constexpr slider_length = 768u;
-
-    std::vector<Slider> sliders (easing_functions.size(), Slider{slider_length, 16.f, 0.5f});
-
-    auto const sliders_set_ratios = [&sliders](float ratio)
+    std::vector<sf::Text> easing_name_texts
     {
-        for (auto& slider : sliders) {
-            slider.set_ratio(ratio);
-        }
+        make_name_text("linear"),
+        make_name_text("square"),
+        make_name_text("cube"),
+        make_name_text("easy")
     };
 
 
 
-    Grid_layout_simple layout {1, {float(slider_length), 128.f}};
-    for (auto const& slider : std::as_const(sliders)) {
-        layout.add(slider);
+    std::vector<Slider> sliders(easing_functions.size(), Slider{slider_length});
+
+
+    std::vector<Interpolation> active_interpolations;
+
+
+    auto const reset_sample_animation
+        = [&active_interpolations, &sliders, &easing_functions]
+    {
+        active_interpolations.clear();
+
+        for (size_t i=0; i < sliders.size(); ++i)
+        {
+            sliders[i].set_ratio(0.f);
+            active_interpolations.emplace_back(
+                easing_functions[i], 0.f, slider_length, animation_duration);
+        }
+    };
+
+    reset_sample_animation();
+
+
+    // global-animation state
+    bool anim_reached_end = false;
+    sf::Clock anim_clock;
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+    Grid_layout_simple layout {2, {float(slider_length) + 64.f, 128.f}};
+
+    for (size_t i=0; i < sliders.size(); ++i) {
+        layout.add(sliders[i]);
+        layout.add(easing_name_texts[i]);
     }
+
     layout.move(88, 128);
 
-
-
-    class
-    {
-        bool        m_is_active   = false;
-        float const m_speed       = 300.f;
-     public:
-
-        float speed() const         { return m_speed; }
-        bool is_active() const      { return m_is_active; }
-        void set_active(bool b)     { m_is_active = b; }
-
-    } animation;
 
 
 
@@ -115,16 +148,13 @@ int main([[maybe_unused]]const int argc, const char** argv)
             if (event.type == sf::Event::KeyPressed)
             {   switch (event.key.code)
                 {
+                case Keyb::Enter:
                 case Keyb::Escape:
                     window.close();
                 break;
 
-                case Keyb::Enter:
-                    sliders_set_ratios(0.f);
-                break;
-
-                case Keyb::Space:
-                    animation.set_active(!animation.is_active());
+                case Keyb::R:
+                    reset_sample_animation();
                 default:
                 break;
                 }
@@ -150,37 +180,32 @@ int main([[maybe_unused]]const int argc, const char** argv)
         }
 
 
-        // moving sliders
-        if (animation.is_active())
+        // --> moving sliders <--
+        if (anim_reached_end && anim_clock.getElapsedTime() > pause_at_end_time)
         {
-            bool is_animation_finished = true; // maybe
+            anim_reached_end = false;
+            reset_sample_animation();
+        }
 
-            auto const distance = animation.speed() * frame_seconds;
+        else if (!anim_reached_end)
+        {
+            anim_reached_end = true; // maybe
 
             for (size_t i=0; i < sliders.size(); ++i)
             {
-                auto const interpolated_value = interpolate(
-                    easing_functions[i],
-                    sliders[i].circle_position() / sliders[i].length() + distance,
-                    0.f,
-                    sliders[i].length()
-                );
+                auto& slider = sliders[i];
 
-                if (i == 3) {
-                    ECHO_LN(interpolated_value);
-                }
-
-                if (sliders[i].ratio() < 1.f)
+                if (slider.ratio() < 1.f)
                 {
-                    is_animation_finished = false;
-                    // sliders[i].set_circle_position(sliders[i].circle_position() + distance * interpolated_value);
-                    sliders[i].set_circle_position(interpolated_value);
+                    anim_reached_end = false;
+
+                    auto& interpolate = active_interpolations[i];
+                    slider.set_circle_position(interpolate(frame_seconds));
                 }
             }
 
-            if (is_animation_finished)
-            {
-                sliders_set_ratios(0.f);
+            if (anim_reached_end) {
+                anim_clock.restart();
             }
         }
 
