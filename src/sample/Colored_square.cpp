@@ -8,7 +8,7 @@ Colored_square::Colored_square(sf::Color start_color, sf::Vector2f size)
 {
     m_rect.setFillColor(start_color);
     m_rect.setOutlineColor(sf::Color::Black);
-    m_rect.setOutlineThickness(2.f);
+    m_rect.setOutlineThickness(3.f);
 }
 
 

@@ -7,6 +7,7 @@
 #include "util/echo.hpp"
 #include "util/filesystem.hpp"
 #include <SFML/Graphics.hpp>
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
@@ -21,8 +22,36 @@
 
 
 
+// Configure sample
 ////////////////////////////////////////////////////////////////////////////////
+static float            animation_duration  = 1.1f;
+auto const              pause_at_end        = sf::milliseconds(500);
+
+auto constexpr          slider_length       = 640;
+
+static sf::Color const  start_color         = sf::Color::Black;
+static sf::Color const  end_color           = sf::Color::White;
+
+auto const              key_reset_anim      = Keyb::R;
+auto const              key_pause_anim      = Keyb::Space;
+
+
+
+// Set easing functions
+////////////////////////////////////////////////////////////////////////////////
+std::vector<std::tuple<easing_fn_t, sf::String>> const named_easing_functions
+{
+    {easing_linear,         "linear"},
+    {easing_linear_square,  "square"},
+    {easing_linear_cube,    "cube"},
+    {easing_easy,           "easy"}
+};
+
+
+
+
 int main([[maybe_unused]]const int argc, const char** argv)
+////////////////////////////////////////////////////////////////////////////////
 {
     // Window
     Window window {
@@ -52,8 +81,92 @@ int main([[maybe_unused]]const int argc, const char** argv)
     font.loadFromFile((resource_path/"font/CutiveMono-Regular.ttf").string());
 
 
+////////////////////////////////////////////////////////////////////////////////
+
+
+    std::vector<easing_fn_t> easing_functions (named_easing_functions.size());
+    std::transform(
+        named_easing_functions.cbegin(),
+        named_easing_functions.cend(),
+        easing_functions.begin(),
+        [](auto const& tuple){ return std::get<easing_fn_t>(tuple); }
+    );
+
+
+
+// Sliders sample
+////////////////////////////////////////////////////////////////////////////////
+    std::vector<Slider> sliders(easing_functions.size(), Slider{slider_length});
+
+    std::vector<Interpolation> sliders_interpolations;
+
+    auto const reset_sliders
+        = [&sliders, &sliders_interpolations, &easing_functions]
+    {
+        sliders_interpolations.clear();
+
+        for (size_t i=0; i < sliders.size(); ++i)
+        {
+            sliders[i].set_ratio(0.f);
+            sliders_interpolations.emplace_back(
+                easing_functions[i], 0.f, slider_length, animation_duration);
+        }
+    };
+
+    reset_sliders();
+
+
+
+// Squares sample
+////////////////////////////////////////////////////////////////////////////////
+    std::vector<Colored_square> squares (easing_functions.size(), start_color);
+
+    std::vector<Interpolation> squares_interpolations;
+
+    auto const reset_squares
+        = [&squares, &squares_interpolations, &easing_functions]
+    {
+        squares_interpolations.clear();
+
+        for (size_t i=0; i < squares.size(); ++i)
+        {
+            squares[i].set_color(start_color);
+
+            squares_interpolations.emplace_back(
+                easing_functions[i],
+                float(start_color.r),
+                float(end_color.r),
+                animation_duration
+            );
+            squares_interpolations.emplace_back(
+                easing_functions[i],
+                float(start_color.g),
+                float(end_color.g),
+                animation_duration
+            );
+            squares_interpolations.emplace_back(
+                easing_functions[i],
+                float(start_color.b),
+                float(end_color.b),
+                animation_duration
+            );
+        }
+    };
+
+    reset_squares();
+
+
+
+    // global-animation state
+    sf::Clock anim_clock;
+    bool anim_reached_end = false;
+    bool anim_paused      = false;
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
+
+
     auto const make_name_text = [&font](sf::String const& str)
     {
         sf::Text t{str, font};
@@ -64,93 +177,26 @@ int main([[maybe_unused]]const int argc, const char** argv)
     };
 
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-
-    // Config sample
-    auto constexpr  slider_length       = 768u;
-    auto const      pause_at_end_time   = sf::milliseconds(500);
-    float constexpr animation_duration  = 1.5f;
-    static sf::Color const start_color  = sf::Color::Black;
-    static sf::Color const end_color    = sf::Color::White;
-
-
-    std::vector<easing_fn_t> easing_functions
-    {
-        easing_linear,
-        easing_linear_square,
-        easing_linear_cube,
-        easing_easy
-    };
-
-
-    std::vector<sf::Text> easing_name_texts
-    {
-        make_name_text("linear"),
-        make_name_text("square"),
-        make_name_text("cube"),
-        make_name_text("easy")
-    };
-
-
-
-    std::vector<Slider> sliders(easing_functions.size(), Slider{slider_length});
-
-    std::vector<Colored_square> squares (easing_functions.size(), start_color);
-
-
-    std::vector<Interpolation> active_interpolations;
-
-
-    auto const reset_sample_animation
-        = [&active_interpolations, &sliders, &squares, &easing_functions]
-    {
-        active_interpolations.clear();
-
-        for (size_t i=0; i < sliders.size(); ++i)
-        {
-            sliders[i].set_ratio(0.f);
-            active_interpolations.emplace_back(
-                easing_functions[i], 0.f, slider_length, animation_duration);
+    std::vector<sf::Text> easing_name_texts (easing_functions.size());
+    std::transform(
+        named_easing_functions.cbegin(),
+        named_easing_functions.cend(),
+        easing_name_texts.begin(),
+        [&](auto const& named_fn) {
+            return make_name_text(std::get<sf::String>(named_fn));
         }
-
-        for (size_t i=0; i < squares.size(); ++i)
-        {
-            squares[i].set_color(start_color);
-
-            active_interpolations.emplace_back(
-                easing_functions[i], start_color.r, end_color.r, animation_duration);
-
-            active_interpolations.emplace_back(
-                easing_functions[i], start_color.g, end_color.g, animation_duration);
-
-            active_interpolations.emplace_back(
-                easing_functions[i], start_color.b, end_color.b, animation_duration);
-        }
-    };
-
-    reset_sample_animation();
+    );
 
 
-    // global-animation state
-    bool anim_reached_end = false;
-    sf::Clock anim_clock;
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-    Grid_layout_simple layout {3, {/* float(slider_length) + 64.f */128.f, 128.f}};
-
-    for (size_t i=0; i < sliders.size(); ++i) {
+    Grid_layout_simple layout {3, {148.f, 128.f}};
+    for (size_t i=0; i < sliders.size(); ++i)
+    {
         layout.add(easing_name_texts[i]);
         layout.add(squares[i]);
         layout.add(sliders[i]);
     }
 
     layout.move(88, 128);
-
 
 
 
@@ -172,8 +218,15 @@ int main([[maybe_unused]]const int argc, const char** argv)
                     window.close();
                 break;
 
-                case Keyb::R:
-                    reset_sample_animation();
+                case key_reset_anim:
+                    reset_sliders();
+                    reset_squares();
+                break;
+
+                case key_pause_anim:
+                    anim_paused = !anim_paused;
+                break;
+
                 default:
                 break;
                 }
@@ -199,14 +252,15 @@ int main([[maybe_unused]]const int argc, const char** argv)
         }
 
 
-        // --> moving sliders <--
-        if (anim_reached_end && anim_clock.getElapsedTime() > pause_at_end_time)
+        // animating samples
+        if (anim_reached_end && anim_clock.getElapsedTime() > pause_at_end)
         {
             anim_reached_end = false;
-            reset_sample_animation();
+            reset_sliders();
+            reset_squares();
         }
 
-        else if (!anim_reached_end)
+        else if (!anim_reached_end && !anim_paused)
         {
             anim_reached_end = true; // maybe
 
@@ -214,24 +268,31 @@ int main([[maybe_unused]]const int argc, const char** argv)
             {
                 auto& slider = sliders[i];
 
-                if (slider.ratio() < 1.f)   // this accounts for sliders finishing at different times (which should not happen)
+                if (slider.ratio() < 1.f) // this...
+                // accounts for sliders finishing at different times
+                // (which should not happen)
                 {
                     anim_reached_end = false;
 
-                    auto& interpolate = active_interpolations[i];
+                    auto& interpolate = sliders_interpolations[i];
                     slider.set_circle_position(interpolate(frame_seconds));
                 }
             }
 
-            auto const interp_index_offset = sliders.size();
+
             for (size_t i=0; i < squares.size(); ++i)
             {
-                squares[i].set_color({
-                    (sf::Uint8)active_interpolations[interp_index_offset+i](frame_seconds),
-                    (sf::Uint8)active_interpolations[interp_index_offset+i+1](frame_seconds),
-                    (sf::Uint8)active_interpolations[interp_index_offset+i+2](frame_seconds)
-                });
+                if (squares[i].color() != end_color)
+                {
+                    squares[i].set_color({
+                        sf::Uint8(squares_interpolations[i](frame_seconds)),
+                        sf::Uint8(squares_interpolations[i+1](frame_seconds)),
+                        sf::Uint8(squares_interpolations[i+2](frame_seconds)),
+                        255
+                    });
+                }
             }
+
 
             if (anim_reached_end) {
                 anim_clock.restart();
