@@ -24,7 +24,6 @@
 
 // Configure sample
 ////////////////////////////////////////////////////////////////////////////////
-static float            animation_duration  = 1.1f;
 auto const              pause_at_end        = sf::milliseconds(500);
 
 auto constexpr          slider_length       = 640;
@@ -32,8 +31,14 @@ auto constexpr          slider_length       = 640;
 static sf::Color const  start_color         = sf::Color::Black;
 static sf::Color const  end_color           = sf::Color::White;
 
-auto const              key_reset_anim      = Keyb::R;
-auto const              key_pause_anim      = Keyb::Space;
+
+struct Keys
+{
+    static Keyb const   reset_anim          = Keyb::R;
+    static Keyb const   pause_anim          = Keyb::Space;
+    static Keyb const   shorten_anim        = Keyb::Subtract;
+    static Keyb const   lengthen_anim       = Keyb::Add;
+} keys;
 
 
 
@@ -50,12 +55,12 @@ std::vector<std::tuple<easing_fn_t, sf::String>> const named_easing_functions
 
 
 
-int main([[maybe_unused]]const int argc, const char** argv)
 ////////////////////////////////////////////////////////////////////////////////
+int main([[maybe_unused]]const int argc, const char** argv)
 {
     // Window
     Window window {
-        sf::VideoMode{1366, 768},
+        sf::VideoMode{1016, 680},
         "easing-01",
         sf::Style::Default
     };
@@ -100,8 +105,8 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
     std::vector<Interpolation> sliders_interpolations;
 
-    auto const reset_sliders
-        = [&sliders, &sliders_interpolations, &easing_functions]
+    static auto const reset_sliders
+        = [&sliders, &sliders_interpolations, &easing_functions](float anim_duration)
     {
         sliders_interpolations.clear();
 
@@ -109,11 +114,9 @@ int main([[maybe_unused]]const int argc, const char** argv)
         {
             sliders[i].set_ratio(0.f);
             sliders_interpolations.emplace_back(
-                easing_functions[i], 0.f, slider_length, animation_duration);
+                easing_functions[i], 0.f, slider_length, anim_duration);
         }
     };
-
-    reset_sliders();
 
 
 
@@ -123,8 +126,8 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
     std::vector<Interpolation> squares_interpolations;
 
-    auto const reset_squares
-        = [&squares, &squares_interpolations, &easing_functions]
+    static auto const reset_squares
+        = [&squares, &squares_interpolations, &easing_functions](float anim_duration)
     {
         squares_interpolations.clear();
 
@@ -136,38 +139,43 @@ int main([[maybe_unused]]const int argc, const char** argv)
                 easing_functions[i],
                 float(start_color.r),
                 float(end_color.r),
-                animation_duration
+                anim_duration
             );
             squares_interpolations.emplace_back(
                 easing_functions[i],
                 float(start_color.g),
                 float(end_color.g),
-                animation_duration
+                anim_duration
             );
             squares_interpolations.emplace_back(
                 easing_functions[i],
                 float(start_color.b),
                 float(end_color.b),
-                animation_duration
+                anim_duration
             );
         }
     };
 
-    reset_squares();
 
 
-
-    // global-animation state
-    sf::Clock anim_clock;
-    bool anim_reached_end = false;
-    bool anim_paused      = false;
-
-
-
+// global-animation state
 ////////////////////////////////////////////////////////////////////////////////
+    struct
+    {
+        sf::Clock clock;
+        bool      reached_end;
+        bool      paused;
+        float     duration = 1.f;
+
+        void reset() { reset_sliders(duration); reset_squares(duration); }
+
+    } animation;
 
 
-    auto const make_name_text = [&font](sf::String const& str)
+
+// Texts and layouts
+////////////////////////////////////////////////////////////////////////////////
+    auto const make_text = [&font](sf::String const& str)
     {
         sf::Text t{str, font};
         t.setFillColor(sf::Color::White);
@@ -177,31 +185,54 @@ int main([[maybe_unused]]const int argc, const char** argv)
     };
 
 
+    auto const duration_text = make_text("animation duration: ");
+    auto duration_value_text = make_text("");
+
+    auto const update_duration_text = [&duration_value_text](float val)
+    {
+        duration_value_text.setString(std::to_string(val).substr(0, 4) + " seconds");
+    };
+    update_duration_text(animation.duration);
+
+
+    Grid_layout_simple duration_texts_layout {2, {360.f, 0.f}};
+        duration_texts_layout.add(duration_text);
+        duration_texts_layout.add(duration_value_text);
+
+
     std::vector<sf::Text> easing_name_texts (easing_functions.size());
     std::transform(
         named_easing_functions.cbegin(),
         named_easing_functions.cend(),
         easing_name_texts.begin(),
         [&](auto const& named_fn) {
-            return make_name_text(std::get<sf::String>(named_fn));
+            return make_text(std::get<sf::String>(named_fn));
         }
     );
 
 
-    Grid_layout_simple layout {3, {148.f, 128.f}};
-    for (size_t i=0; i < sliders.size(); ++i)
-    {
-        layout.add(easing_name_texts[i]);
-        layout.add(squares[i]);
-        layout.add(sliders[i]);
-    }
+    Grid_layout_simple samples_layout {3, {148.f, 128.f}};
+        for (size_t i=0; i < sliders.size(); ++i)
+        {
+            samples_layout.add(easing_name_texts[i]);
+            samples_layout.add(squares[i]);
+            samples_layout.add(sliders[i]);
+        }
 
-    layout.move(88, 128);
+
+
+    Grid_layout_simple layout {1, {0.f, 128.f}};
+        layout.add(duration_texts_layout);
+        layout.add(samples_layout);
+
+    layout.move(32, 32);
 
 
 
 // App loop
 ////////////////////////////////////////////////////////////////////////////////
+    animation.reset();
+
     while (window.is_open())
     {
         // state
@@ -218,13 +249,24 @@ int main([[maybe_unused]]const int argc, const char** argv)
                     window.close();
                 break;
 
-                case key_reset_anim:
-                    reset_sliders();
-                    reset_squares();
+                case keys.reset_anim:
+                    animation.reset();
                 break;
 
-                case key_pause_anim:
-                    anim_paused = !anim_paused;
+                case keys.pause_anim:
+                    animation.paused = !animation.paused;
+                break;
+
+                case keys.shorten_anim:
+                    animation.duration = std::max(0.f, animation.duration-0.1f);
+                    update_duration_text(animation.duration);
+                    animation.reset();
+                break;
+
+                case keys.lengthen_anim:
+                    animation.duration += .1f;
+                    update_duration_text(animation.duration);
+                    animation.reset();
                 break;
 
                 default:
@@ -253,16 +295,15 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
         // animating samples
-        if (anim_reached_end && anim_clock.getElapsedTime() > pause_at_end)
+        if (animation.reached_end && animation.clock.getElapsedTime() > pause_at_end)
         {
-            anim_reached_end = false;
-            reset_sliders();
-            reset_squares();
+            animation.reached_end = false;
+            animation.reset();
         }
 
-        else if (!anim_reached_end && !anim_paused)
+        else if (!animation.reached_end && !animation.paused)
         {
-            anim_reached_end = true; // maybe
+            animation.reached_end = true; // maybe
 
             for (size_t i=0; i < sliders.size(); ++i)
             {
@@ -272,7 +313,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
                 // accounts for sliders finishing at different times
                 // (which should not happen)
                 {
-                    anim_reached_end = false;
+                    animation.reached_end = false;
 
                     auto& interpolate = sliders_interpolations[i];
                     slider.set_circle_position(interpolate(frame_seconds));
@@ -294,8 +335,8 @@ int main([[maybe_unused]]const int argc, const char** argv)
             }
 
 
-            if (anim_reached_end) {
-                anim_clock.restart();
+            if (animation.reached_end) {
+                animation.clock.restart();
             }
         }
 
