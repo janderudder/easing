@@ -8,6 +8,7 @@
 #include "util/filesystem.hpp"
 #include <SFML/Graphics.hpp>
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <vector>
 
@@ -59,6 +60,34 @@ std::array<sf::String, 4> const easing_names
 
 
 
+// Control animation state
+////////////////////////////////////////////////////////////////////////////////
+struct Animation
+{
+    sf::Clock             clock;
+    sf::Time              paused_at;
+    float                 duration    = 1.f;
+    bool                  reached_end = false;
+
+private:
+    std::function<void()> m_reset_function;
+    sf::Clock             m_pause_clock;
+    bool                  m_paused          = false;
+
+public:
+    void reset()        { std::invoke(m_reset_function); clock.restart(); }
+    void toggle_pause() { m_paused = !m_paused; m_pause_clock.restart(); }
+
+    auto is_paused() const  { return m_paused; }
+    auto pause_time() const { return m_pause_clock.getElapsedTime(); }
+
+    template<typename Fn>
+    void set_reset_function(Fn fn) { m_reset_function = fn; }
+
+};
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 int main([[maybe_unused]]const int argc, const char** argv)
@@ -99,7 +128,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
     std::vector<Interpolation> sliders_interpolations;
 
-    static auto const reset_sliders
+    auto const reset_sliders
         = [&sliders, &sliders_interpolations](float anim_duration)
     {
         sliders_interpolations.clear();
@@ -114,13 +143,14 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
 
+
 // Squares sample
 ////////////////////////////////////////////////////////////////////////////////
     std::vector<Colored_square> squares (easing_functions.size(), start_color);
 
     std::vector<Interpolation> squares_interpolations;
 
-    static auto const reset_squares
+    auto const reset_squares
         = [&squares, &squares_interpolations](float anim_duration)
     {
         squares_interpolations.clear();
@@ -152,18 +182,15 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
 
+
 // global-animation state
 ////////////////////////////////////////////////////////////////////////////////
-    struct
-    {
-        sf::Clock clock;
-        bool      reached_end;
-        bool      paused;
-        float     duration = 1.f;
+    Animation animation;
+    animation.set_reset_function([&animation, &reset_squares, &reset_sliders] {
+        reset_squares(animation.duration);
+        reset_sliders(animation.duration);
+    });
 
-        void reset() { reset_sliders(duration); reset_squares(duration); }
-
-    } animation;
 
 
 
@@ -247,7 +274,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
                 break;
 
                 case keys.pause_anim:
-                    animation.paused = !animation.paused;
+                    animation.toggle_pause();
                 break;
 
                 case keys.shorten_anim:
@@ -288,31 +315,26 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
 
         // animating samples
-        if (animation.reached_end && animation.clock.getElapsedTime() > pause_at_end)
+        if (animation.reached_end && animation.pause_time() > pause_at_end)
         {
             animation.reached_end = false;
+            animation.toggle_pause();
             animation.reset();
         }
 
-        else if (!animation.reached_end && !animation.paused)
+        else if (!animation.reached_end && !animation.is_paused())
         {
-            animation.reached_end = true; // maybe
-
             for (size_t i=0; i < sliders.size(); ++i)
             {
                 auto& slider = sliders[i];
 
-                if (slider.ratio() < 1.f) // this...
-                // // accounts for sliders finishing at different times
-                // // (which should not happen)
-                {
-                    animation.reached_end = false;
+                auto& interpolate = sliders_interpolations[i];
+                slider.set_circle_position(interpolate(frame_seconds));
 
-                    auto& interpolate = sliders_interpolations[i];
-                    slider.set_circle_position(interpolate(frame_seconds));
+                if (slider.ratio() >= 1.f) {
+                    animation.reached_end = true;
                 }
             }
-
 
             for (size_t i=0; i < squares.size(); ++i)
             {
@@ -327,11 +349,11 @@ int main([[maybe_unused]]const int argc, const char** argv)
                 }
             }
 
-
             if (animation.reached_end) {
-                animation.clock.restart();
+                animation.toggle_pause();
             }
         }
+
 
 
         // Rendering
