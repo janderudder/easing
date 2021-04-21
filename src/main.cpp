@@ -11,8 +11,6 @@
 #include <iostream>
 #include <vector>
 
-
-
 // Project specific includes
 ////////////////////////////////////////////////////////////////////////////////
 #include "easing/easing.hpp"
@@ -22,34 +20,41 @@
 
 
 
-// Configure sample
+
+// Sample configuration
 ////////////////////////////////////////////////////////////////////////////////
 auto const              pause_at_end        = sf::milliseconds(500);
-
 auto constexpr          slider_length       = 640;
-
-static sf::Color const  start_color         = sf::Color::Black;
-static sf::Color const  end_color           = sf::Color::White;
-
-
-struct Keys
-{
-    static Keyb const   reset_anim          = Keyb::R;
-    static Keyb const   pause_anim          = Keyb::Space;
-    static Keyb const   shorten_anim        = Keyb::Subtract;
-    static Keyb const   lengthen_anim       = Keyb::Add;
-} keys;
+static sf::Color const  start_color         = sf::Color::White;
+static sf::Color const  end_color           = sf::Color::Black;
+struct Keys {
+    Keyb                pause_anim          = Keyb::Space;
+    Keyb                reset_anim          = Keyb::R;
+    Keyb                next_frame          = Keyb::N;
+    Keyb                shorten_anim        = Keyb::Subtract;
+    Keyb                lengthen_anim       = Keyb::Add;
+} constexpr keys;
 
 
 
-// Set easing functions
+
+// Map easing functions to their name string
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<std::tuple<easing_fn_t, sf::String>> const named_easing_functions
+constexpr std::array<easing_fn_t, 4> easing_functions
 {
-    {easing_linear,         "linear"},
-    {easing_linear_square,  "square"},
-    {easing_linear_cube,    "cube"},
-    {easing_easy,           "easy"}
+    easing_linear,
+    easing_linear_square,
+    easing_linear_cube,
+    easing_easy
+};
+
+
+std::array<sf::String, 4> const easing_names
+{
+    "linear",
+    "square",
+    "cube",
+    "easy"
 };
 
 
@@ -86,17 +91,6 @@ int main([[maybe_unused]]const int argc, const char** argv)
     font.loadFromFile((resource_path/"font/CutiveMono-Regular.ttf").string());
 
 
-////////////////////////////////////////////////////////////////////////////////
-
-
-    std::vector<easing_fn_t> easing_functions (named_easing_functions.size());
-    std::transform(
-        named_easing_functions.cbegin(),
-        named_easing_functions.cend(),
-        easing_functions.begin(),
-        [](auto const& tuple){ return std::get<easing_fn_t>(tuple); }
-    );
-
 
 
 // Sliders sample
@@ -106,7 +100,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
     std::vector<Interpolation> sliders_interpolations;
 
     static auto const reset_sliders
-        = [&sliders, &sliders_interpolations, &easing_functions](float anim_duration)
+        = [&sliders, &sliders_interpolations](float anim_duration)
     {
         sliders_interpolations.clear();
 
@@ -127,7 +121,7 @@ int main([[maybe_unused]]const int argc, const char** argv)
     std::vector<Interpolation> squares_interpolations;
 
     static auto const reset_squares
-        = [&squares, &squares_interpolations, &easing_functions](float anim_duration)
+        = [&squares, &squares_interpolations](float anim_duration)
     {
         squares_interpolations.clear();
 
@@ -190,40 +184,39 @@ int main([[maybe_unused]]const int argc, const char** argv)
 
     auto const update_duration_text = [&duration_value_text](float val)
     {
-        duration_value_text.setString(std::to_string(val).substr(0, 4) + " seconds");
+        duration_value_text.setString(
+            std::to_string(val).substr(0, 4) + " seconds");
     };
+
     update_duration_text(animation.duration);
 
 
     Grid_layout_simple duration_texts_layout {2, {360.f, 0.f}};
-        duration_texts_layout.add(duration_text);
-        duration_texts_layout.add(duration_value_text);
+    duration_texts_layout.add(duration_text);
+    duration_texts_layout.add(duration_value_text);
 
 
-    std::vector<sf::Text> easing_name_texts (easing_functions.size());
+    std::vector<sf::Text> easing_names_texts (easing_names.size());
     std::transform(
-        named_easing_functions.cbegin(),
-        named_easing_functions.cend(),
-        easing_name_texts.begin(),
-        [&](auto const& named_fn) {
-            return make_text(std::get<sf::String>(named_fn));
-        }
+        easing_names.cbegin(), easing_names.cend(),
+        easing_names_texts.begin(),
+        [&](auto const& easing_name) { return make_text(easing_name); }
     );
 
 
     Grid_layout_simple samples_layout {3, {148.f, 128.f}};
-        for (size_t i=0; i < sliders.size(); ++i)
-        {
-            samples_layout.add(easing_name_texts[i]);
-            samples_layout.add(squares[i]);
-            samples_layout.add(sliders[i]);
-        }
+    for (size_t i=0; i < sliders.size(); ++i)
+    {
+        samples_layout.add(easing_names_texts[i]);
+        samples_layout.add(squares[i]);
+        samples_layout.add(sliders[i]);
+    }
 
 
 
     Grid_layout_simple layout {1, {0.f, 128.f}};
-        layout.add(duration_texts_layout);
-        layout.add(samples_layout);
+    layout.add(duration_texts_layout);
+    layout.add(samples_layout);
 
     layout.move(32, 32);
 
@@ -310,8 +303,8 @@ int main([[maybe_unused]]const int argc, const char** argv)
                 auto& slider = sliders[i];
 
                 if (slider.ratio() < 1.f) // this...
-                // accounts for sliders finishing at different times
-                // (which should not happen)
+                // // accounts for sliders finishing at different times
+                // // (which should not happen)
                 {
                     animation.reached_end = false;
 
