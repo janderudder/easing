@@ -231,11 +231,11 @@ int main([[maybe_unused]]const int argc, const char** argv)
     );
 
 
-    Grid_layout_simple samples_layout {3, {148.f, 128.f}};
+    Grid_layout_simple samples_layout {2, {148.f, 128.f}};
     for (size_t i=0; i < sliders.size(); ++i)
     {
         samples_layout.add(easing_names_texts[i]);
-        samples_layout.add(squares[i]);
+        // samples_layout.add(squares[i]);
         samples_layout.add(sliders[i]);
     }
 
